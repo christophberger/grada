@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -81,15 +80,6 @@ type Metric struct {
 	head int
 }
 
-// NewMetric creates a new Metric struct with a target name and
-// with a ring buffer of the given size.
-func NewMetric(name string, size int) *Metric {
-	return &Metric{
-		list: make([]Count, size, size),
-		head: 0,
-	}
-}
-
 // Add a single value to the ring buffer. When the ring buffer
 // is full, every new value overwrites the oldest one.
 func (g *Metric) Add(n float64) {
@@ -137,23 +127,15 @@ func (g *Metric) fetchMetric() *[]Row {
 // Metrics is a map of all metric buffers, with the key being the target name.
 type Metrics map[string]*Metric
 
-// ## The data generator
-
-func spawnGoroutines() {
-	for {
-		// Spawn a few dozen goroutines in a burst.
-		for i := 0; i < rand.Intn(20)+20; i++ {
-			// Each goroutine shall live for a random time between
-			// 1 and 100 seconds.
-			go func(n int) {
-				time.Sleep(time.Duration(n) * time.Second)
-			}(rand.Intn(100))
-		}
-		// Wait for a few seconds between goroutine bursts.
-		// The more goroutines exist, the longer the wait.
-		time.Sleep(time.Duration(rand.Intn(10)+runtime.NumGoroutine()/10) * time.Second)
+// CreateMetric creates a new Metric with the given target name and buffer size
+// and adds it to the Metrics map.
+func (m *Metrics) CreateMetric(name string, size int) {
+	(*m)[name] = &Metric{
+		list: make([]Count, size, size),
 	}
 }
+
+// ## The data generator
 
 func newFakeDataFunc(max int, volatility float64) func() int {
 	value := rand.Intn(max)
@@ -208,18 +190,6 @@ func (app *App) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) searchHandler(w http.ResponseWriter, r *http.Request) {
-	var targets []string
-	for t, _ := range *(a.Metrics) {
-		targets = append(targets, t)
-	}
-	resp, err := json.Marshal(targets)
-	if err != nil {
-		writeError(w, err, "cannot marshal targets response")
-	}
-	w.Write(resp)
-}
-
 func (app *App) sendTimeseries(w http.ResponseWriter, q *Query) {
 
 	log.Println("Sending time series data")
@@ -269,6 +239,21 @@ func (app *App) sendTable(w http.ResponseWriter, q *Query) {
 
 	w.Write(jsonResp)
 
+}
+
+// A search request from Grafana expects a list of target names as a response.
+// These names are shown in the metrics dropdown when selecting a metric in
+// the Metrics tab of a panel.
+func (a *App) searchHandler(w http.ResponseWriter, r *http.Request) {
+	var targets []string
+	for t, _ := range *(a.Metrics) {
+		targets = append(targets, t)
+	}
+	resp, err := json.Marshal(targets)
+	if err != nil {
+		writeError(w, err, "cannot marshal targets response")
+	}
+	w.Write(resp)
 }
 
 func Start() {
