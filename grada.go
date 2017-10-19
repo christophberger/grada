@@ -137,18 +137,6 @@ func (m *Metrics) CreateMetric(name string, size int) {
 	}
 }
 
-// ## The data generator
-
-func newFakeDataFunc(max int, volatility float64) func() int {
-	value := rand.Intn(max)
-	return func() int {
-		rnd := rand.Float64() - 0.5
-		changePercent := 2 * volatility * rnd
-		value += int(float64(value) * changePercent)
-		return value
-	}
-}
-
 // ## The server
 
 type Server struct {
@@ -258,16 +246,17 @@ func (a *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-func StartServer() {
+func StartServer() *Server {
 
-	app := &Server{Metrics: &Metrics{}}
+	server := &Server{Metrics: &Metrics{}}
 
 	// Grafana expects a "200 OK" status for "/" when testing the connection.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	http.HandleFunc("/query", app.queryHandler)
+	http.HandleFunc("/query", server.queryHandler)
+	http.HandleFunc("/search", server.searchHandler)
 
 	// Start the server.
 	log.Println("start grafanago")
@@ -276,4 +265,5 @@ func StartServer() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	return server
 }
