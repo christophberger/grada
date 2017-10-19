@@ -10,13 +10,13 @@ import (
 	"time"
 )
 
-// Query is a `/query` request from Grafana.
+// query is a `/query` request from Grafana.
 //
 // All JSON-related structs were generated from the JSON examples
 // of the "SimpleJson" data source documentation
 // using [JSON-to-Go](https://mholt.github.io/json-to-go/),
 // with a little tweaking afterwards.
-type Query struct {
+type query struct {
 	PanelID int `json:"panelId"`
 	Range   struct {
 		From time.Time `json:"from"`
@@ -41,26 +41,28 @@ type Query struct {
 	MaxDataPoints int    `json:"maxDataPoints"`
 }
 
-// Row is used in TimeseriesResponse and TableResponse.
+// row is used in timeseriesResponse and tableResponse.
 // Grafana's JSON contains weird arrays with mixed types!
-type Row []interface{}
+type row []interface{}
 
-// TimeseriesResponse is the response to a `/query` request
-// if "Type" is set to "timeserie".
-// It sends time series data back to Grafana.
-type TimeseriesResponse struct {
-	Target     string `json:"target"`
-	Datapoints []Row  `json:"datapoints"`
-}
-
-// TableResponse is the response to send when "Type" is "table".
-type Column struct {
+// column is used in tableResponse.
+type column struct {
 	Text string `json:"text"`
 	Type string `json:"type"`
 }
-type TableResponse struct {
-	Columns []Column `json:"columns"`
-	Rows    []Row    `json:"rows"`
+
+// timeseriesResponse is the response to a `/query` request
+// if "Type" is set to "timeserie".
+// It sends time series data back to Grafana.
+type timeseriesResponse struct {
+	Target     string `json:"target"`
+	Datapoints []row  `json:"datapoints"`
+}
+
+// tableResponse is the response to send when "Type" is "table".
+type tableResponse struct {
+	Columns []column `json:"columns"`
+	Rows    []row    `json:"rows"`
 	Type    string   `json:"type"`
 }
 
@@ -107,7 +109,7 @@ func (g *Metric) AppendWithTime(n float64, t time.Time) {
 	g.m.Unlock()
 }
 
-func (g *Metric) fetchMetric() *[]Row {
+func (g *Metric) fetchMetric() *[]row {
 
 	g.m.Lock()
 	length := len(g.list)
@@ -116,10 +118,10 @@ func (g *Metric) fetchMetric() *[]Row {
 	copy(gcnt, g.list)
 	g.m.Unlock()
 
-	rows := []Row{}
+	rows := []row{}
 	for i := 0; i < length; i++ {
 		count := gcnt[(i+head)%length] // wrap around
-		rows = append(rows, Row{count.N, count.T.UnixNano() / 1000000})
+		rows = append(rows, row{count.N, count.T.UnixNano() / 1000000})
 	}
 	return &rows
 }
@@ -149,7 +151,7 @@ func newFakeDataFunc(max int, volatility float64) func() int {
 
 // ## The server
 
-type App struct {
+type Server struct {
 	Metrics *Metrics
 }
 
@@ -159,7 +161,7 @@ func writeError(w http.ResponseWriter, e error, m string) {
 
 }
 
-func (app *App) queryHandler(w http.ResponseWriter, r *http.Request) {
+func (app *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	var q bytes.Buffer
 
 	_, err := q.ReadFrom(r.Body)
@@ -168,7 +170,7 @@ func (app *App) queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := &Query{}
+	query := &query{}
 	err = json.Unmarshal(q.Bytes(), query)
 	if err != nil {
 		writeError(w, err, "cannot unmarshal request body")
@@ -190,12 +192,12 @@ func (app *App) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *App) sendTimeseries(w http.ResponseWriter, q *Query) {
+func (app *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending time series data")
 
 	target := q.Targets[0].Target
-	response := []TimeseriesResponse{
+	response := []timeseriesResponse{
 		{
 			Target:     target,
 			Datapoints: (*(*app.Metrics)[target].fetchMetric()),
@@ -211,18 +213,18 @@ func (app *App) sendTimeseries(w http.ResponseWriter, q *Query) {
 
 }
 
-func (app *App) sendTable(w http.ResponseWriter, q *Query) {
+func (app *Server) sendTable(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending table data")
 
-	response := []TableResponse{
+	response := []tableResponse{
 		{
-			Columns: []Column{
+			Columns: []column{
 				{Text: "Name", Type: "string"},
 				{Text: "Value", Type: "number"},
 				{Text: "Time", Type: "time"},
 			},
-			Rows: []Row{
+			Rows: []row{
 				{"Alpha", rand.Intn(100), float64(int64(time.Now().UnixNano() / 1000000))},
 				{"Bravo", rand.Intn(100), float64(int64(time.Now().UnixNano() / 1000000))},
 				{"Charlie", rand.Intn(100), float64(int64(time.Now().UnixNano() / 1000000))},
@@ -244,7 +246,7 @@ func (app *App) sendTable(w http.ResponseWriter, q *Query) {
 // A search request from Grafana expects a list of target names as a response.
 // These names are shown in the metrics dropdown when selecting a metric in
 // the Metrics tab of a panel.
-func (a *App) searchHandler(w http.ResponseWriter, r *http.Request) {
+func (a *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	var targets []string
 	for t, _ := range *(a.Metrics) {
 		targets = append(targets, t)
@@ -256,9 +258,9 @@ func (a *App) searchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-func Start() {
+func StartServer() {
 
-	app := &App{Metrics: &Metrics{}}
+	app := &Server{Metrics: &Metrics{}}
 
 	// Grafana expects a "200 OK" status for "/" when testing the connection.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
