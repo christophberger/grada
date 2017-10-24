@@ -1,12 +1,22 @@
 package grada
 
+// Code required for communicating with Grafana:
+// * Server
+// * Handlers
+// * Structs
+//
+// Grafana sends three queries:
+// * /search for retrieving the available targets
+// * /query for requesting new sets of data
+// * /annotation for requesting chart annotations
+
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -66,77 +76,6 @@ type tableResponse struct {
 	Type    string   `json:"type"`
 }
 
-// ## The data aggregator
-
-// Count is a single time series data tuple, consisting of
-// a float64 value N and a timestamp T.
-type Count struct {
-	N float64
-	T time.Time
-}
-
-// Metric is a ring buffer of Counts.
-type Metric struct {
-	m    sync.Mutex
-	list []Count
-	head int
-}
-
-// Add a single value to the ring buffer. When the ring buffer
-// is full, every new value overwrites the oldest one.
-func (g *Metric) Add(n float64) {
-	g.m.Lock()
-	g.list[g.head] = Count{n, time.Now()}
-	g.head = (g.head + 1) % len(g.list)
-	g.m.Unlock()
-}
-
-// Add list adds a complete Count list to the ring buffer.
-func (g *Metric) AddList(c []Count) {
-	g.m.Lock()
-	for _, el := range c {
-		g.list[g.head] = el
-		g.head = (g.head + 1) % len(g.list)
-	}
-	g.m.Unlock()
-}
-
-// AddWithTime adds a single (value, timestamp) tuple to the ring buffer.
-func (g *Metric) AppendWithTime(n float64, t time.Time) {
-	g.m.Lock()
-	g.list[g.head] = Count{n, t}
-	g.head = (g.head + 1) % len(g.list)
-	g.m.Unlock()
-}
-
-func (g *Metric) fetchMetric() *[]row {
-
-	g.m.Lock()
-	length := len(g.list)
-	gcnt := make([]Count, length, length)
-	head := g.head
-	copy(gcnt, g.list)
-	g.m.Unlock()
-
-	rows := []row{}
-	for i := 0; i < length; i++ {
-		count := gcnt[(i+head)%length] // wrap around
-		rows = append(rows, row{count.N, count.T.UnixNano() / 1000000})
-	}
-	return &rows
-}
-
-// Metrics is a map of all metric buffers, with the key being the target name.
-type Metrics map[string]*Metric
-
-// CreateMetric creates a new Metric with the given target name and buffer size
-// and adds it to the Metrics map.
-func (m *Metrics) CreateMetric(name string, size int) {
-	(*m)[name] = &Metric{
-		list: make([]Count, size, size),
-	}
-}
-
 // ## The server
 
 type Server struct {
@@ -149,7 +88,7 @@ func writeError(w http.ResponseWriter, e error, m string) {
 
 }
 
-func (app *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	var q bytes.Buffer
 
 	_, err := q.ReadFrom(r.Body)
@@ -174,21 +113,25 @@ func (app *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	// or a table response.
 	switch query.Targets[0].Type {
 	case "timeserie":
-		app.sendTimeseries(w, query)
+		srv.sendTimeseries(w, query)
 	case "table":
-		app.sendTable(w, query)
+		srv.sendTable(w, query)
 	}
 }
 
-func (app *Server) sendTimeseries(w http.ResponseWriter, q *query) {
+func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending time series data")
 
 	target := q.Targets[0].Target
+	metric, ok := srv.Metrics.metric[target]
+	if !ok {
+		writeError(w, errors.New("No metric for target "+target), "")
+	}
 	response := []timeseriesResponse{
 		{
 			Target:     target,
-			Datapoints: (*(*app.Metrics)[target].fetchMetric()),
+			Datapoints: *(metric.fetchDatapoints()),
 		},
 	}
 
@@ -201,7 +144,7 @@ func (app *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 }
 
-func (app *Server) sendTable(w http.ResponseWriter, q *query) {
+func (srv *Server) sendTable(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending table data")
 
@@ -234,9 +177,9 @@ func (app *Server) sendTable(w http.ResponseWriter, q *query) {
 // A search request from Grafana expects a list of target names as a response.
 // These names are shown in the metrics dropdown when selecting a metric in
 // the Metrics tab of a panel.
-func (a *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	var targets []string
-	for t, _ := range *(a.Metrics) {
+	for t, _ := range srv.Metrics.metric {
 		targets = append(targets, t)
 	}
 	resp, err := json.Marshal(targets)
