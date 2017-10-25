@@ -17,6 +17,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -78,11 +79,11 @@ type tableResponse struct {
 
 // ## The server
 
-// Server is an API server for Grafana. It manages a list of metrics
+// server is a Web API server for Grafana. It manages a list of metrics
 // by target name. When Grafana requests new data for a target,
 // the server returns the current list of metrics for that target.
-type Server struct {
-	Metrics *Metrics
+type server struct {
+	metrics *metrics
 }
 
 func writeError(w http.ResponseWriter, e error, m string) {
@@ -91,7 +92,7 @@ func writeError(w http.ResponseWriter, e error, m string) {
 
 }
 
-func (srv *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
+func (srv *server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	var q bytes.Buffer
 
 	_, err := q.ReadFrom(r.Body)
@@ -122,7 +123,8 @@ func (srv *Server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
+// sendTimeseries creates and writes a JSON response to a request for time series data.
+func (srv *server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending time series data")
 
@@ -130,7 +132,7 @@ func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	for _, t := range q.Targets {
 		target := t.Target
-		metric, ok := srv.Metrics.metric[target]
+		metric, ok := srv.metrics.metric[target]
 		if !ok {
 			writeError(w, errors.New("No metric for target "+target), "")
 			return
@@ -151,7 +153,8 @@ func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 }
 
 // TODO: Just a dummy for now
-func (srv *Server) sendTable(w http.ResponseWriter, q *query) {
+// sendTable creates and writes a JSON response to a request for table data
+func (srv *server) sendTable(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending table data")
 
@@ -184,9 +187,9 @@ func (srv *Server) sendTable(w http.ResponseWriter, q *query) {
 // A search request from Grafana expects a list of target names as a response.
 // These names are shown in the metrics dropdown when selecting a metric in
 // the Metrics tab of a panel.
-func (srv *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
+func (srv *server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	var targets []string
-	for t, _ := range srv.Metrics.metric {
+	for t, _ := range srv.metrics.metric {
 		targets = append(targets, t)
 	}
 	resp, err := json.Marshal(targets)
@@ -196,10 +199,10 @@ func (srv *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-// StartServer creates and starts the API server.
-func StartServer() *Server {
+// startServer creates and starts the API server.
+func startServer() *server {
 
-	server := &Server{Metrics: &Metrics{}}
+	server := &server{metrics: &metrics{}}
 
 	// Grafana expects a "200 OK" status for "/" when testing the connection.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -209,10 +212,15 @@ func StartServer() *Server {
 	http.HandleFunc("/query", server.queryHandler)
 	http.HandleFunc("/search", server.searchHandler)
 
-	// Start the server.
-	err := http.ListenAndServe(":3001", nil)
-	if err != nil {
-		log.Fatalln(err)
+	// Determine the port. Default is 3001 but can be changed via
+	// environment variable GRADA_PORT.
+	port := "3001"
+	portenv := os.Getenv("GRADA_PORT")
+	if portenv != "" {
+		port = portenv
 	}
+
+	// Start the server.
+	go http.ListenAndServe(":"+port, nil)
 	return server
 }

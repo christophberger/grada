@@ -36,6 +36,7 @@ func (g *Metric) AddWithTime(n float64, t time.Time) {
 	g.AddCount(Count{n, t})
 }
 
+// AddCount adds a complete Count object to the metric data.
 func (g *Metric) AddCount(c Count) {
 	g.m.Lock()
 	defer g.m.Unlock()
@@ -43,6 +44,7 @@ func (g *Metric) AddCount(c Count) {
 	g.head = (g.head + 1) % len(g.list)
 }
 
+// Called by the Web API server.
 func (g *Metric) fetchDatapoints() *[]row {
 
 	g.m.Lock()
@@ -58,15 +60,16 @@ func (g *Metric) fetchDatapoints() *[]row {
 	return &rows
 }
 
-// Metrics is a map of all metric buffers, with the key being the target name.
-type Metrics struct {
+// metrics is a map of all metric buffers, with the key being the target name.
+// Used internally by the HTTP server and the dashboard.
+type metrics struct {
 	m      sync.Mutex
 	metric map[string]*Metric
 }
 
 // Get gets the metric with name "target" from the Metrics map. If a metric of that name
 // does not exists in the map, Get returns an error.
-func (m *Metrics) Get(target string) (*Metric, error) {
+func (m *metrics) Get(target string) (*Metric, error) {
 	m.m.Lock()
 	mt, ok := m.metric[target]
 	m.m.Unlock()
@@ -78,7 +81,7 @@ func (m *Metrics) Get(target string) (*Metric, error) {
 
 // Put adds a Metric to the Metrics map. Adding an already existing metric
 // is an error.
-func (m *Metrics) Put(target string, metric *Metric) error {
+func (m *metrics) Put(target string, metric *Metric) error {
 	m.m.Lock()
 	defer m.m.Unlock()
 
@@ -92,7 +95,7 @@ func (m *Metrics) Put(target string, metric *Metric) error {
 
 // Delete removes a metric from the Metrics map. Deleting a non-existing
 // metric is an error.
-func (m *Metrics) Delete(target string) error {
+func (m *metrics) Delete(target string) error {
 	m.m.Lock()
 	defer m.m.Unlock()
 	_, exists := m.metric[target]
@@ -106,7 +109,7 @@ func (m *Metrics) Delete(target string) error {
 // Create creates a new Metric with the given target name and buffer size
 // and adds it to the Metrics map.
 // If a metric for target "target" exists already, Create returns an error.
-func (m *Metrics) Create(target string, size int) (*Metric, error) {
+func (m *metrics) Create(target string, size int) (*Metric, error) {
 	metric := &Metric{
 		list: make([]Count, size, size),
 	}

@@ -227,11 +227,11 @@ func TestMetrics_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics := &Metrics{
+			mt := &metrics{
 				m:      sync.Mutex{},
 				metric: tt.fields.metric,
 			}
-			got, err := metrics.Get(tt.args.target)
+			got, err := mt.Get(tt.args.target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Metrics.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -271,7 +271,7 @@ func TestMetrics_Put(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &Metrics{
+			m := &metrics{
 				m:      sync.Mutex{},
 				metric: map[string]*Metric{},
 			}
@@ -312,7 +312,7 @@ func TestMetrics_Delete(t *testing.T) {
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &Metrics{
+			m := &metrics{
 				m:      sync.Mutex{},
 				metric: tt.fields.metric,
 			}
@@ -352,16 +352,16 @@ func TestMetrics_Create(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics := &Metrics{
+			mt := &metrics{
 				m:      sync.Mutex{},
 				metric: metric,
 			}
-			got, err := metrics.Create(tt.args.target, tt.args.size)
+			got, err := mt.Create(tt.args.target, tt.args.size)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Metrics.Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			want := metrics.metric[tt.args.target]
+			want := mt.metric[tt.args.target]
 			if got != want {
 				t.Errorf("Metrics.Create() = %v, want %v", got, want)
 			}
