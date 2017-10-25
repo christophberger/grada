@@ -78,6 +78,9 @@ type tableResponse struct {
 
 // ## The server
 
+// Server is an API server for Grafana. It manages a list of metrics
+// by target name. When Grafana requests new data for a target,
+// the server returns the current list of metrics for that target.
 type Server struct {
 	Metrics *Metrics
 }
@@ -123,17 +126,19 @@ func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending time series data")
 
-	target := q.Targets[0].Target
-	metric, ok := srv.Metrics.metric[target]
-	if !ok {
-		writeError(w, errors.New("No metric for target "+target), "")
-		return
-	}
-	response := []timeseriesResponse{
-		{
+	response := []timeseriesResponse{}
+
+	for _, t := range q.Targets {
+		target := t.Target
+		metric, ok := srv.Metrics.metric[target]
+		if !ok {
+			writeError(w, errors.New("No metric for target "+target), "")
+			return
+		}
+		response = append(response, timeseriesResponse{
 			Target:     target,
 			Datapoints: *(metric.fetchDatapoints()),
-		},
+		})
 	}
 
 	jsonResp, err := json.Marshal(response)
@@ -145,6 +150,7 @@ func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 }
 
+// TODO: Just a dummy for now
 func (srv *Server) sendTable(w http.ResponseWriter, q *query) {
 
 	log.Println("Sending table data")
@@ -190,6 +196,7 @@ func (srv *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// StartServer creates and starts the API server.
 func StartServer() *Server {
 
 	server := &Server{Metrics: &Metrics{}}
@@ -203,8 +210,6 @@ func StartServer() *Server {
 	http.HandleFunc("/search", server.searchHandler)
 
 	// Start the server.
-	log.Println("start grafanago")
-	defer log.Println("stop grafanago")
 	err := http.ListenAndServe(":3001", nil)
 	if err != nil {
 		log.Fatalln(err)
