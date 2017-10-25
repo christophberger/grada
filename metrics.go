@@ -105,6 +105,7 @@ func (m *Metrics) Delete(target string) error {
 
 // Create creates a new Metric with the given target name and buffer size
 // and adds it to the Metrics map.
+// If a metric for target "target" exists already, Create returns an error.
 func (m *Metrics) Create(target string, size int) (*Metric, error) {
 	metric := &Metric{
 		list: make([]Count, size, size),
