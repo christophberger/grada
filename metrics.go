@@ -50,7 +50,7 @@ func (g *Metric) fetchDatapoints() *[]row {
 	length := len(g.list)
 	head := g.head
 
-	rows := make([]row, length)
+	rows := make([]row, 0, length)
 	for i := 0; i < length; i++ {
 		count := g.list[(i+head)%length]                                // wrap around
 		rows = append(rows, row{count.N, count.T.UnixNano() / 1000000}) // need ms
@@ -99,7 +99,7 @@ func (m *Metrics) Delete(target string) error {
 	if !exists {
 		return errors.New("cannot delete metric: " + target + " does not exist")
 	}
-	m.metric[target] = nil
+	delete(m.metric, target)
 	return nil
 }
 
