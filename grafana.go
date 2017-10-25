@@ -127,6 +127,7 @@ func (srv *Server) sendTimeseries(w http.ResponseWriter, q *query) {
 	metric, ok := srv.Metrics.metric[target]
 	if !ok {
 		writeError(w, errors.New("No metric for target "+target), "")
+		return
 	}
 	response := []timeseriesResponse{
 		{
