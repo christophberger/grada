@@ -171,14 +171,35 @@ func TestMetric_fetchDatapoints(t *testing.T) {
 	t3ms := t3.UnixNano() / 1000000
 
 	tests := []struct {
-		name   string
-		fields fields
-		want   *[]row
+		name     string
+		fields   fields
+		from, to time.Time
+		max      int
+		want     *[]row
 	}{
 		{
-			"fetch1",
+			"fetchAll",
 			fields{[]Count{{3, t3}, {1, t1}, {2, t2}}, 1},
+			time.Date(2017, time.October, 25, 11, 15, 54, 0, time.UTC),
+			time.Date(2017, time.October, 25, 11, 20, 54, 0, time.UTC),
+			3,
 			&[]row{{1.0, t1ms}, {2.0, t2ms}, {3.0, t3ms}},
+		},
+		{
+			"fetchTimeRange",
+			fields{[]Count{{3, t3}, {1, t1}, {2, t2}}, 1},
+			time.Date(2017, time.October, 25, 11, 17, 00, 0, time.UTC),
+			time.Date(2017, time.October, 25, 11, 20, 54, 0, time.UTC),
+			3,
+			&[]row{{2.0, t2ms}, {3.0, t3ms}},
+		},
+		{
+			"fetchMaxPoints",
+			fields{[]Count{{3, t3}, {1, t1}, {2, t2}}, 1},
+			time.Date(2017, time.October, 25, 11, 15, 00, 0, time.UTC),
+			time.Date(2017, time.October, 25, 11, 20, 00, 0, time.UTC),
+			2,
+			&[]row{{1.0, t1ms}, {2.0, t2ms}},
 		},
 	}
 
@@ -189,7 +210,7 @@ func TestMetric_fetchDatapoints(t *testing.T) {
 				list: tt.fields.list,
 				head: tt.fields.head,
 			}
-			if got := g.fetchDatapoints(); !cmp.Equal(got, tt.want) {
+			if got := g.fetchDatapoints(tt.from, tt.to, tt.max); !cmp.Equal(got, tt.want) {
 				t.Errorf("Metric.fetchDatapoints():\ngot  %#v,\nwant %#v\nDiff: %s", got, tt.want, cmp.Diff(got, tt.want))
 			}
 		})
@@ -374,13 +395,14 @@ func TestMetrics_Create(t *testing.T) {
 
 func TestMetric_sort(t *testing.T) {
 	type fields struct {
-		list []Count
-		head int
+		list     []Count
+		head     int
+		unsorted bool
 	}
 	tests := []struct {
 		name   string
 		fields fields
-		want   []Count
+		want   fields
 	}{
 		{
 			name: "sorted",
@@ -392,13 +414,44 @@ func TestMetric_sort(t *testing.T) {
 					Count{N: 4, T: time.Unix(1509369032, 630000004)},
 					Count{N: 5, T: time.Unix(1509369032, 630000005)},
 				},
+				head:     0,
+				unsorted: false,
 			},
-			want: []Count{
-				Count{N: 1, T: time.Unix(1509369032, 630000001)},
-				Count{N: 2, T: time.Unix(1509369032, 630000002)},
-				Count{N: 3, T: time.Unix(1509369032, 630000003)},
-				Count{N: 4, T: time.Unix(1509369032, 630000004)},
-				Count{N: 5, T: time.Unix(1509369032, 630000005)},
+			want: fields{
+				[]Count{
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+				},
+				0,
+				false,
+			},
+		},
+		{
+			name: "sortedButShifted",
+			fields: fields{
+				list: []Count{
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+				},
+				head:     2,
+				unsorted: false,
+			},
+			want: fields{
+				[]Count{
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+				},
+				2,
+				false,
 			},
 		},
 		{
@@ -411,25 +464,34 @@ func TestMetric_sort(t *testing.T) {
 					Count{N: 1, T: time.Unix(1509369032, 630000001)},
 					Count{N: 2, T: time.Unix(1509369032, 630000002)},
 				},
+				head:     5,
+				unsorted: true,
 			},
-			want: []Count{
-				Count{N: 1, T: time.Unix(1509369032, 630000001)},
-				Count{N: 2, T: time.Unix(1509369032, 630000002)},
-				Count{N: 3, T: time.Unix(1509369032, 630000003)},
-				Count{N: 4, T: time.Unix(1509369032, 630000004)},
-				Count{N: 5, T: time.Unix(1509369032, 630000005)},
+			want: fields{
+				[]Count{
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+				},
+				0,
+				false,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &Metric{
-				list: tt.fields.list,
-				head: tt.fields.head,
+				list:     tt.fields.list,
+				head:     tt.fields.head,
+				unsorted: tt.fields.unsorted,
 			}
 			g.sort()
-			if !cmp.Equal(g.list, tt.want) {
-				t.Errorf("Metric.sort(): got %v,\nwant %v\ndiff:\n%s", g.list, tt.want, cmp.Diff(g.list, tt.want))
+			got := g.list
+			want := tt.want.list
+			if !cmp.Equal(got, want) {
+				t.Errorf("Metric.sort(): got %v,\nwant %v\ndiff:\n%s", got, want, cmp.Diff(got, want))
 			}
 		})
 	}

@@ -48,7 +48,13 @@ func (g *Metric) AddCount(c Count) {
 }
 
 // sort sorts the list of metrics by timestamp.
+// if the list is already sorted, sort() is a no-op.
 func (g *Metric) sort() {
+	if !g.unsorted {
+		return
+	}
+
+	// the ring buffer is unsorted.
 
 	// sooner implements the less func for sort.Slice.
 	sooner := func(i, j int) bool {
@@ -57,24 +63,28 @@ func (g *Metric) sort() {
 
 	sort.Slice(g.list, sooner)
 	g.head = 0
+	g.unsorted = false
 }
 
-// Called by the Web API server.
-func (g *Metric) fetchDatapoints() *[]row {
+// fetchDatapoints is called by the Web API server.
+// It extracts all datapoints from g.list that fall within the time range [from, to],
+// with at most maxDataPoints items.
+func (g *Metric) fetchDatapoints(from, to time.Time, maxDataPoints int) *[]row {
 
 	g.m.Lock()
 	defer g.m.Unlock()
 	length := len(g.list)
-	head := g.head
 
-	if g.unsorted {
-		g.sort()
-	}
+	g.sort()
 
 	rows := make([]row, 0, length)
-	for i := 0; i < length; i++ {
-		count := g.list[(i+head)%length]                                // wrap around
-		rows = append(rows, row{count.N, count.T.UnixNano() / 1000000}) // need ms
+	points := 0
+	for i := 0; i < length && points < maxDataPoints; i++ {
+		count := g.list[(i+g.head)%length] // wrap around
+		if count.T.After(from) && count.T.Before(to) {
+			rows = append(rows, row{count.N, count.T.UnixNano() / 1000000}) // need ms
+			points++
+		}
 	}
 	return &rows
 }

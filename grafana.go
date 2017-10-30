@@ -139,7 +139,7 @@ func (srv *server) sendTimeseries(w http.ResponseWriter, q *query) {
 		}
 		response = append(response, timeseriesResponse{
 			Target:     target,
-			Datapoints: *(metric.fetchDatapoints()),
+			Datapoints: *(metric.fetchDatapoints(q.Range.From, q.Range.To, q.MaxDataPoints)),
 		})
 	}
 
