@@ -1,7 +1,7 @@
 package grada
 
 type Dashboard struct {
-	s *server
+	srv *server
 }
 
 var d *Dashboard
@@ -9,8 +9,12 @@ var d *Dashboard
 // GetDashboard initializes and/or returns the only existing dashboard
 func GetDashboard() *Dashboard {
 	if d == nil {
-		d = &Dashboard{}
-		d.s = startServer()
+		d = &Dashboard{
+			srv: &server{
+				metrics: &metrics{},
+			},
+		}
+		d.srv = startServer()
 	}
 	return d
 }
@@ -20,10 +24,10 @@ func GetDashboard() *Dashboard {
 // Creating a metric for an existing target is an error. To replace a metric
 // (which is rarely needed), call DeleteMetric first.
 func (d *Dashboard) CreateMetric(target string, size int) (*Metric, error) {
-	return d.s.metrics.Create(target, size)
+	return d.srv.metrics.Create(target, size)
 }
 
 // DeleteMetric deletes the metric for the given target from the server.
 func (d *Dashboard) DeleteMetric(target string) error {
-	return d.s.metrics.Delete(target)
+	return d.srv.metrics.Delete(target)
 }
