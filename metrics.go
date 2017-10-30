@@ -2,6 +2,7 @@ package grada
 
 import (
 	"errors"
+	"sort"
 	"sync"
 	"time"
 )
@@ -17,9 +18,10 @@ type Count struct {
 
 // Metric is a ring buffer of Counts.
 type Metric struct {
-	m    sync.Mutex
-	list []Count
-	head int
+	m        sync.Mutex
+	list     []Count
+	head     int
+	unsorted bool // AddWithTime() and AddCount() do not add in a sorted manner.
 }
 
 // Add a single value to the ring buffer. When the ring buffer
@@ -40,8 +42,21 @@ func (g *Metric) AddWithTime(n float64, t time.Time) {
 func (g *Metric) AddCount(c Count) {
 	g.m.Lock()
 	defer g.m.Unlock()
+	g.unsorted = true
 	g.list[g.head] = c
 	g.head = (g.head + 1) % len(g.list)
+}
+
+// sort sorts the list of metrics by timestamp.
+func (g *Metric) sort() {
+
+	// sooner implements the less func for sort.Slice.
+	sooner := func(i, j int) bool {
+		return g.list[i].T.UnixNano() < g.list[j].T.UnixNano()
+	}
+
+	sort.Slice(g.list, sooner)
+	g.head = 0
 }
 
 // Called by the Web API server.
@@ -51,6 +66,10 @@ func (g *Metric) fetchDatapoints() *[]row {
 	defer g.m.Unlock()
 	length := len(g.list)
 	head := g.head
+
+	if g.unsorted {
+		g.sort()
+	}
 
 	rows := make([]row, 0, length)
 	for i := 0; i < length; i++ {
@@ -113,6 +132,6 @@ func (m *metrics) Create(target string, size int) (*Metric, error) {
 	metric := &Metric{
 		list: make([]Count, size, size),
 	}
-	m.Put(target, metric)
-	return metric, nil
+	err := m.Put(target, metric)
+	return metric, err
 }

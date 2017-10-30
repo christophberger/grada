@@ -208,7 +208,7 @@ func TestMetrics_Get(t *testing.T) {
 	t2 := time.Date(2017, time.October, 25, 11, 17, 54, 0, time.UTC)
 	t3 := time.Date(2017, time.October, 25, 11, 18, 54, 0, time.UTC)
 
-	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1}
+	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1, false}
 
 	tests := []struct {
 		name    string
@@ -254,7 +254,7 @@ func TestMetrics_Put(t *testing.T) {
 	t1 := time.Date(2017, time.October, 25, 11, 16, 54, 0, time.UTC)
 	t2 := time.Date(2017, time.October, 25, 11, 17, 54, 0, time.UTC)
 	t3 := time.Date(2017, time.October, 25, 11, 18, 54, 0, time.UTC)
-	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1}
+	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1, false}
 
 	tests := []struct {
 		name    string
@@ -296,7 +296,7 @@ func TestMetrics_Delete(t *testing.T) {
 	t1 := time.Date(2017, time.October, 25, 11, 16, 54, 0, time.UTC)
 	t2 := time.Date(2017, time.October, 25, 11, 17, 54, 0, time.UTC)
 	t3 := time.Date(2017, time.October, 25, 11, 18, 54, 0, time.UTC)
-	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1}
+	metric := &Metric{sync.Mutex{}, []Count{{3, t3}, {1, t1}, {2, t2}}, 1, false}
 
 	tests := []struct {
 		name    string
@@ -341,12 +341,12 @@ func TestMetrics_Create(t *testing.T) {
 	}{
 		{
 			"metric1",
-			args{"target1", 1000},
+			args{"target1", 10},
 			false,
 		},
 		{
 			"metric1again",
-			args{"target1", 1000},
+			args{"target1", 10},
 			true,
 		},
 	}
@@ -362,11 +362,74 @@ func TestMetrics_Create(t *testing.T) {
 				return
 			}
 			want := mt.metric[tt.args.target]
-			if got != want {
-				t.Errorf("Metrics.Create() = %v, want %v", got, want)
+			if !cmp.Equal(got, want, cmp.AllowUnexported((*got), (*got).m)) {
+				t.Errorf("Metrics.Create():\ngot  %v\nwant %v\ndiff:\n%s", got, want, cmp.Diff(got, want, cmp.AllowUnexported(*got, (*got).m)))
 			}
 			if cap(got.list) != tt.args.size {
 				t.Errorf("Metrics.Create(): got size %d, want %d", cap(got.list), tt.args.size)
+			}
+		})
+	}
+}
+
+func TestMetric_sort(t *testing.T) {
+	type fields struct {
+		list []Count
+		head int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []Count
+	}{
+		{
+			name: "sorted",
+			fields: fields{
+				list: []Count{
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+				},
+			},
+			want: []Count{
+				Count{N: 1, T: time.Unix(1509369032, 630000001)},
+				Count{N: 2, T: time.Unix(1509369032, 630000002)},
+				Count{N: 3, T: time.Unix(1509369032, 630000003)},
+				Count{N: 4, T: time.Unix(1509369032, 630000004)},
+				Count{N: 5, T: time.Unix(1509369032, 630000005)},
+			},
+		},
+		{
+			name: "unsorted",
+			fields: fields{
+				list: []Count{
+					Count{N: 4, T: time.Unix(1509369032, 630000004)},
+					Count{N: 3, T: time.Unix(1509369032, 630000003)},
+					Count{N: 5, T: time.Unix(1509369032, 630000005)},
+					Count{N: 1, T: time.Unix(1509369032, 630000001)},
+					Count{N: 2, T: time.Unix(1509369032, 630000002)},
+				},
+			},
+			want: []Count{
+				Count{N: 1, T: time.Unix(1509369032, 630000001)},
+				Count{N: 2, T: time.Unix(1509369032, 630000002)},
+				Count{N: 3, T: time.Unix(1509369032, 630000003)},
+				Count{N: 4, T: time.Unix(1509369032, 630000004)},
+				Count{N: 5, T: time.Unix(1509369032, 630000005)},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &Metric{
+				list: tt.fields.list,
+				head: tt.fields.head,
+			}
+			g.sort()
+			if !cmp.Equal(g.list, tt.want) {
+				t.Errorf("Metric.sort(): got %v,\nwant %v\ndiff:\n%s", g.list, tt.want, cmp.Diff(g.list, tt.want))
 			}
 		})
 	}
