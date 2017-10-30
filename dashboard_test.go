@@ -53,3 +53,20 @@ func TestDashboard_CreateMetric(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDashboard(t *testing.T) {
+	tests := []struct {
+		name string
+	}{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetDashboard()
+			if got.srv == nil {
+				t.Errorf("GetDashboard().srv == nil")
+			}
+			if got.srv.metrics == nil {
+				t.Errorf("GetDashboard().srv.metrics == nil")
+			}
+		})
+	}
+}

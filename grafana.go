@@ -109,9 +109,6 @@ func (srv *server) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Our example should contain exactly one target.
-	target := query.Targets[0].Target
-
-	log.Println("Sending response for target " + target)
 
 	// Depending on the type, we need to send either a timeseries response
 	// or a table response.
@@ -125,8 +122,6 @@ func (srv *server) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 // sendTimeseries creates and writes a JSON response to a request for time series data.
 func (srv *server) sendTimeseries(w http.ResponseWriter, q *query) {
-
-	log.Println("Sending time series data")
 
 	response := []timeseriesResponse{}
 
@@ -202,7 +197,11 @@ func (srv *server) searchHandler(w http.ResponseWriter, r *http.Request) {
 // startServer creates and starts the API server.
 func startServer() *server {
 
-	server := &server{metrics: &metrics{}}
+	server := &server{
+		metrics: &metrics{
+			metric: map[string]*Metric{},
+		},
+	}
 
 	// Grafana expects a "200 OK" status for "/" when testing the connection.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

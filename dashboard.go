@@ -4,18 +4,10 @@ type Dashboard struct {
 	srv *server
 }
 
-var d *Dashboard
-
 // GetDashboard initializes and/or returns the only existing dashboard
 func GetDashboard() *Dashboard {
-	if d == nil {
-		d = &Dashboard{
-			srv: &server{
-				metrics: &metrics{},
-			},
-		}
-		d.srv = startServer()
-	}
+	d := &Dashboard{}
+	d.srv = startServer()
 	return d
 }
 
