@@ -3,6 +3,7 @@ package grada
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -66,6 +67,27 @@ func TestGetDashboard(t *testing.T) {
 			}
 			if got.srv.metrics == nil {
 				t.Errorf("GetDashboard().srv.metrics == nil")
+			}
+		})
+	}
+}
+
+func TestDashboard_BufSizeFor(t *testing.T) {
+	tests := []struct {
+		name                string
+		timeRange, interval time.Duration
+		want                int
+	}{
+		{"1min, 1s", time.Minute, time.Second, 60},
+		{"1h, 10s", time.Hour, 10 * time.Second, 360},
+		{"12s, 11s", 12 * time.Second, 11 * time.Second, 1},
+		{"1min, 2min", time.Minute, 2 * time.Minute, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &Dashboard{}
+			if got := d.BufSizeFor(tt.timeRange, tt.interval); got != tt.want {
+				t.Errorf("Dashboard.For() = %v, want %v", got, tt.want)
 			}
 		})
 	}
