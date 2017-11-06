@@ -13,13 +13,10 @@ package grada
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
-
-	tm "github.com/buger/goterm"
 )
 
 // query is a `/query` request from Grafana.
@@ -128,18 +125,6 @@ func (srv *server) sendTimeseries(w http.ResponseWriter, q *query) {
 
 	response := []timeseriesResponse{}
 
-	tbl := tm.NewTable(0, 40, 2, ' ', 0)
-	if debug {
-		tm.Clear()
-		tm.MoveCursor(1, 1)
-		tm.Println("Targets:", q.Targets)
-		fmt.Fprintf(tbl, "metric\tfrom\tto\n")
-		fmt.Fprintf(tbl, "%s\t%s\t%s\n", "Requested", q.Range.From, q.Range.To)
-		for name, m := range srv.metrics.metric {
-			fmt.Fprintf(tbl, "%s\t%s\t%s\n", name, m.list[m.head].T.UTC(), m.list[(m.head-1)%len(m.list)].T.UTC())
-		}
-	}
-
 	for _, t := range q.Targets {
 		target := t.Target
 		metric, err := srv.metrics.Get(target)
@@ -151,12 +136,6 @@ func (srv *server) sendTimeseries(w http.ResponseWriter, q *query) {
 			Target:     target,
 			Datapoints: *(metric.fetchDatapoints(q.Range.From, q.Range.To, q.MaxDataPoints)),
 		})
-
-		if debug {
-
-			fmt.Println(tbl)
-			tm.Flush()
-		}
 	}
 
 	jsonResp, err := json.Marshal(response)
@@ -215,10 +194,6 @@ func (srv *server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 // startServer creates and starts the API server.
 func startServer() *server {
-
-	if os.Getenv("GRADA_DEBUG") != "" {
-		debug = true
-	}
 
 	server := &server{
 		metrics: &metrics{
