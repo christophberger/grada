@@ -8,21 +8,21 @@ Whenever you have code that generates time series data (for example, the current
 
 ![DIY Dashboard](diydashboard.png)
 
-Package grada is a simple DIY dashboard based on
+### Package grada is a simple DIY dashboard based on
 [Grafana](https://github.com/grafana) and the [Simple JSON Datasource
 plugin](https://github.com/grafana/simple-json-datasource).
 
 
-The motivation behind Grada
+### The motivation behind Grada
 
-Grada provides an easy way of monitoring any sort of time series data generated
+### Grada provides an easy way of monitoring any sort of time series data generated
 by your code. Whether you want to observe the number of active goroutines, the
 CPU load, the air temperature outside your house, or whatever data source you
 can think of - Grada makes it easy to turn that data into graphs, gauges,
 histograms, or tables.
 
 
-Using Grafana as a dashboard server
+### Using Grafana as a dashboard server
 
 I happened to stumble upon Grafana recently. Grafana is a highly configurable
 dashboard server for time series databases and other data sources. Quickly, an
@@ -33,7 +33,7 @@ Now whenever you have some data that can be associated with a point in time,
 Grada can put this data into a dashboard.
 
 
-How to use Grada
+### How to use Grada
 
 In a very dense overview:
 
@@ -54,9 +54,9 @@ For more details, see https://appliedgo.net/diydashboard as well as the package
 API documentation below.
 
 
-Installation and update
+### Installation and update
 
-Simply run
+### Simply run
 
     go get -u github.com/christophberger/grada
 
