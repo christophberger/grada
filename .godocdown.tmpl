@@ -5,6 +5,9 @@ cd $GOPATH/src/github.com/christophberger/grada
 godocdown -heading="Title" . > README.md
 
 Use -heading="Title" to comply with the godoc title rules.
+
+Get godocdown at https://github.com/robertkrimen/godocdown
+
 -->
 
 # Grada - A DIY dashboard based on Grafana
