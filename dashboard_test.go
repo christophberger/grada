@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestDashboard_CreateMetric(t *testing.T) {
+func TestDashboard_CreateMetricWithBufSize(t *testing.T) {
 	type args struct {
 		target string
 		size   int
@@ -42,7 +42,7 @@ func TestDashboard_CreateMetric(t *testing.T) {
 					metrics: tt.metrics,
 				},
 			}
-			got, err := d.CreateMetric(tt.args.target, tt.args.size)
+			got, err := d.CreateMetricWithBufSize(tt.args.target, tt.args.size)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Server.CreateMetric() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -72,7 +72,7 @@ func TestGetDashboard(t *testing.T) {
 	}
 }
 
-func TestDashboard_BufSizeFor(t *testing.T) {
+func TestDashboard_bufSizeFor(t *testing.T) {
 	tests := []struct {
 		name                string
 		timeRange, interval time.Duration
@@ -86,7 +86,7 @@ func TestDashboard_BufSizeFor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &Dashboard{}
-			if got := d.BufSizeFor(tt.timeRange, tt.interval); got != tt.want {
+			if got := d.bufSizeFor(tt.timeRange, tt.interval); got != tt.want {
 				t.Errorf("Dashboard.For() = %v, want %v", got, tt.want)
 			}
 		})
