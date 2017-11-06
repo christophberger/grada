@@ -10,13 +10,16 @@ import (
 // ## The data aggregator
 
 // Count is a single time series data tuple, consisting of
-// a float64 value N and a timestamp T.
+// a floating-point value N and a timestamp T.
 type Count struct {
 	N float64
 	T time.Time
 }
 
-// Metric is a ring buffer of Counts.
+// Metric is a ring buffer of Counts. It collects time series data that a Grafana
+// dashboard panel can request at regular intervals.
+// Each Metric has a name that Grafana uses for selecting the desired data stream.
+// See Dashboard.CreateMetric().
 type Metric struct {
 	m        sync.Mutex
 	list     []Count
@@ -24,8 +27,8 @@ type Metric struct {
 	unsorted bool // AddWithTime() and AddCount() do not add in a sorted manner.
 }
 
-// Add a single value to the ring buffer. When the ring buffer
-// is full, every new value overwrites the oldest one.
+// Add a single value to the Metric buffer, along with the current time stamp.
+// When the buffer is full, every new value overwrites the oldest one.
 func (g *Metric) Add(n float64) {
 	g.m.Lock()
 	defer g.m.Unlock()
