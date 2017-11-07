@@ -28,7 +28,13 @@ In a very dense overview:
 		* Set its datasource to the metrics created by your app. e.g. metric1, metric2, etc.
 		* The data of the respective metric(s) should now begin to appear in the panel.
 
-For more details, see https://appliedgo.net/diydashboard as well as the package API documentation below.
+
+Details and sample code
+
+For more details, see the blog article at https://appliedgo.net/diydashboard as well as the package API documentation below.
+
+The article consists of a step-by-step setup of Grafana and a sample app that produces "fake" time series data.
+
 
 Installation and update
 
