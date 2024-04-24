@@ -20,7 +20,9 @@ Whenever you have code that generates time series data (for example, the current
 
 ![DIY Dashboard](diydashboard.png)
 
-### Package grada is a simple DIY dashboard based on
+### Package grada is a simple DIY dashboard 
+
+based on
 [Grafana](https://github.com/grafana) and the [Simple JSON Datasource
 plugin](https://github.com/grafana/simple-json-datasource).
 
