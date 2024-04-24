@@ -148,10 +148,10 @@ func TestMetric_AddCount(t *testing.T) {
 			}
 			g.AddCount(tt.args.c)
 			if got := tt.fields.list[tt.fields.head].N; got != tt.args.c.N {
-				t.Errorf("AddCount(%f, %s) failed for %s", tt.args.c.N, tt.args.c.T.String(), tt.name, got)
+				t.Errorf("AddCount(%f, %s) failed for %s - got %f", tt.args.c.N, tt.args.c.T.String(), tt.name, got)
 			}
 			if got := tt.fields.list[tt.fields.head].T; got != tt.args.c.T {
-				t.Errorf("AddCount(%f, %s) failed for %s - got ", tt.args.c.N, tt.args.c.T.String(), tt.name, got)
+				t.Errorf("AddCount(%f, %s) failed for %s - got %v", tt.args.c.N, tt.args.c.T.String(), tt.name, got)
 			}
 		})
 	}
